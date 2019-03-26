@@ -13,6 +13,10 @@ var NewsSchema = new Schema ({
         type: String,
         required: true
     },
+    headline: {
+        type: String,
+        required: true
+    },
     note: {
         type: Schema.Types.ObjectId,
         ref: "note"

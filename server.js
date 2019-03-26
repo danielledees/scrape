@@ -1,5 +1,7 @@
 var express = require("express");
+var logger = require("morgan");
 var mongoose = require("mongoose");
+const mongooseValidationErrorTransform = require('mongoose-validation-error-transform');
 
 var axios = require("axios");
 var cheerio = require("cheerio");
@@ -10,11 +12,15 @@ var PORT = 8080;
 
 var app = express();
 
+app.use(logger("dev"));
 app.use(express.urlencoded({ extended: true}));
 app.use(express.json());
 app.use(express.static("public"));
 
-mongoose.connect("mongodb://localhost/scrapeRA", {useNewUrlParser: true});
+
+mongoose.connect("mongodb://localhost/RA", { useNewUrlParser: true });
+
+
 
 //routes
 
@@ -22,19 +28,29 @@ mongoose.connect("mongodb://localhost/scrapeRA", {useNewUrlParser: true});
 app.get("/scrape", function(req, res) {
     axios.get("https://www.residentadvisor.net/news").then(function(response) {
         var $ = cheerio.load(response.data);
-
-        $("title h1").each(function(i, element) {
+        console.log("scraping Started")
+        $("article").each(function(i, element) {
             var result = {};
 
             result.title = $(this)
-            .children("a")
+            .find("h1")
             .text();
             result.link = $(this)
-            .children("a")
+            .find("a.title")
             .attr("href");
+            result.headline = $(this)
+            .find(".pt4 f28")
+            .text();
+            if (!result.link) {
+                result.link = "link not available"
+            } 
+            // console.log($(this).find("a.title").attr("href"));
+            // console.log($(this).find("h1").text());
 
-            console.log(result.title);
-            console.log(result.link);
+            // console.log(result.title);
+            // console.log(result.link);
+           
+            console.log(result);
             
             db.News.create(result)
             .then(function(dbNews) {
@@ -46,6 +62,9 @@ app.get("/scrape", function(req, res) {
         });
 
         res.send("scrape completed");
+        console.log("done")
+        // console.log(result + "results");
+        // console.log(dbNews + "dbNews");
     });
 });
 
@@ -59,6 +78,10 @@ app.get("/news", function(req, res) {
     .catch(function(err) {
         res.json(err);
     });
+});
+
+app.post("/news:id", function(req, res) {
+    console.log(req.params.id);
 });
 
 
