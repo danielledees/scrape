@@ -4,7 +4,7 @@ var mongoose = require("mongoose");
 var Schema = mongoose.Schema;
 
 //creates a new userschema object usng the above schema
-var NewsSchema = new Schema ({
+var ArticleSchema = new Schema ({
     title: {
         type: String,
         required: true
@@ -13,17 +13,17 @@ var NewsSchema = new Schema ({
         type: String,
         required: true
     },
-    headline: {
-        type: String,
-        required: true
-    },
+    // headline: {
+    //     type: String,
+    //     required: true
+    // },
     note: {
         type: Schema.Types.ObjectId,
-        ref: "note"
+        ref: "Note"
     }
 });
 
 //mongoose's model method
-var News = mongoose.model("News", NewsSchema);
+var Article = mongoose.model("Article", ArticleSchema);
 
-module.exports = News;
+module.exports = Article;
