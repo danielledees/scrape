@@ -15,10 +15,41 @@ app.use(express.urlencoded({ extended: true}));
 app.use(express.json());
 app.use(express.static("public"));
 
+// Set Handlebars.
+var exphbs = require("express-handlebars");
+
+app.engine("handlebars", exphbs({ defaultLayout: "main" }));
+app.set("view engine", "handlebars");
+
 
 mongoose.connect("mongodb://localhost/RA", { useNewUrlParser: true });
 
 //routes
+
+//handlebars route
+app.get("/", function(req, res) {
+    db.Article.find({})
+    .then(function (dbArticle) {
+        var hbsObject = {
+            article: dbArticle
+        };
+        res.render("index", hbsObject);
+    })
+    .catch(function(err) {
+        console.log(err);
+    }); 
+});
+
+app.get("/saved", function(req, res) {
+    db.Article.find({saved: true})
+    .populate("notes")
+    .exec(function(err, articles) {
+        var hbsObject = {
+            article: articles
+        };
+        res.render("saved", hbsObject);
+    });
+});
 
 //GET route for scraping from resident advisor news column
 app.get("/scrape", function(req, res) {
@@ -26,18 +57,21 @@ app.get("/scrape", function(req, res) {
         var $ = cheerio.load(response.data);
 
         console.log("scraping Started")
-        $("article").each(function(i, element) {
+        $("article.highlight-top").each(function(i, element) {
             var result = {};
 
+            // result.image = $(this)
+            // .find("thumb")
+            // .attr("img");
             result.title = $(this)
             .find("h1")
             .text();
             result.link = $(this)
-            .find("a.title")
+            .find("a")
             .attr("href");
-            // result.headline = $(this)
-            // .find(".pt4 f28")
-            // .text();
+            result.headline = $(this)
+            .find("p.copy")
+            .text();
             if (!result.link) {
                 result.link = "link not available"
             } 
@@ -58,7 +92,8 @@ app.get("/scrape", function(req, res) {
             });
         });
 
-        res.send("scrape completed");
+        res.redirect("/");
+        // res.render("index", hbsObject);
         console.log("done")
         // console.log(result + "results");
         // console.log(dbNews + "dbNews");
@@ -77,7 +112,9 @@ app.get("/news", function(req, res) {
     });
 });
 
-//specific article
+
+
+//route to grab specific article with note
 app.get("/news/:id", function(req, res) {
     db.Article.findOne({ _id: req.params.id})
     .populate("note")
@@ -89,17 +126,30 @@ app.get("/news/:id", function(req, res) {
     });
 });
 
+//route for saving an article
+app.post("/news/save/:id", function(req, res) {
+    db.Article.findOneAndUpdate({_id: req.params.id}, {saved: true})
+    .exec(function(err, data) {
+        if (err) {
+            console.log(err);
+        }
+        else {
+            res.send(data);
+        }
+    });
+    
+});
 
-//save & update article's notes
+
+
+//route for saving/updating article's notes
 app.post("/news/:id", function(req, res) {
-    console.log(req.params.id);
     db.Note.create(req.body)
     .then(function(dbNote) {
         return db.Article.findOneAndUpdate({ _id: req.params.id}, {note: dbNote._id}, {new: true});
     })
     .then(function(dbArticle) {
         res.json(dbArticle);
-
     })
     .catch(function(err) {
         res.json(err);
@@ -107,12 +157,64 @@ app.post("/news/:id", function(req, res) {
 });
 
 
-//save & update article's notes
-app.delete("/news/:id", function(req, res) {
+//route to delete one article
+app.post("/news/delete/:id", function(req, res) {
+    db.Article.findOneAndUpdate({id: req.params.id}, {saved: false})
+    .exec(function(err, data) {
+        if (err) {
+            console.log(err);
+        }
+        else {
+            res.send(data);
+        }
+    });
+});
+
+
+//route for grabbing all saved articles
+app.get("/saved", function(req, res) {
+    db.Article.find({saved: true})
+    .populate("note")
+    .then(function(dbArticle) {
+        res.json(dbArticle);
+    })
+    .catch(function(err) {
+        res.json(err);
+    });
+});
+
+
+//route to save new note
+app.post("/notes/save/:id", function(req, res) {
+    var newNote = new Note ({
+        body: req.body.text,
+        article: req.params.id
+    });
+    newNote.save(function(err, data) {
+        if (err) {
+            console.log(err)
+        }
+        else {
+            db.Article.findOneAndUpdate({id: req.params.id}, {$push: {"notes": data}})
+            .exec(function(error) {
+                if (error) {
+                    console.log(error);
+                }
+                else {
+                    res.send(data);
+                }
+            });
+        }
+    });
+});
+
+
+//route to delete an article's note
+app.delete("/notes/delete/:note_id/:article_id", function(req, res) {
     console.log(req.params.id);
-    db.Note.deleteOne(req.body)
+    db.Note.findOneandRemove({id: req.params.note_id})
     .then(function(dbNote) {
-        return db.Article.findOneAndDelete({ _id: req.params.id}, {note: dbNote._id}, {new: true});
+        return db.Article.findOneAndRemove({ _id: req.params.id}, {note: dbNote._id}, {new: true});
     })
     .then(function(dbArticle) {
         res.json(dbArticle);
@@ -124,6 +226,14 @@ app.delete("/news/:id", function(req, res) {
 });
 
 
+//delete all articles
+app.delete("/news/delete", function(req, res) {
+    db.Article.remove({})
+    .then(function(err) {
+        res.json(err);
+    })
+  
+});
 
 app.listen(PORT, function() {
     console.log("App listening on port " + PORT);
