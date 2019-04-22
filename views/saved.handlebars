@@ -13,12 +13,15 @@
                 <h5 class="card-header">{{this.title}}</h5>
                 <div class="card-body">
                     <h5 class="card-title">{{this.headline}}</h5>
-                    <a href="https://www.residentadvisor.net/{{this.link}}"" target="_blank">"https://www.residentadvisor.net/{{this.link}}</a>
+                        <a href = {{link}}>{{title}}</a>
                 </div>
             </div>
-                <button type="button" class="btn btn-success addNote" data-toggle="modal" data-target="#noteModal{{this._id}}" data-id={{this._id}}>Add a Note</button>
-                
-                <button type="button" class="btn btn-danger" id="delete" data-id={{this._id}}>Delete</button>
+
+            
+                <button type="button" class="btn btn-success addNote" data-toggle="modal" data-target="#noteModal{{this._id}}" data-id={{_id}}>Add a Note   </button> 
+
+                <button type="button" class="btn btn-danger" id="delete" data-id={{_id}}>Delete</button>
+                {{> notes/notes-modal }}
     </div>
 </div>
             {{/each}}
@@ -31,6 +34,9 @@
         {{/if}}
 
 
-{{!-- {{#each article}}
-    {{> notes-modal }}
-{{/each}} --}}
+        
+
+
+{{#each article}}
+    {{> notes/notes-modal }}
+{{/each}}

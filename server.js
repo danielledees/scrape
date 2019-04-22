@@ -3,6 +3,7 @@ var logger = require("morgan");
 var mongoose = require("mongoose");
 var axios = require("axios");
 var cheerio = require("cheerio");
+var path = require("path");
 
 var db = require("./models");
 
@@ -18,11 +19,12 @@ app.use(express.static("public"));
 // Set Handlebars.
 var exphbs = require("express-handlebars");
 
-app.engine("handlebars", exphbs({ defaultLayout: "main" }));
+app.engine("handlebars", exphbs({ defaultLayout: "main", partialsDir: path.join(__dirname, "/views/layouts/partials") }));
 app.set("view engine", "handlebars");
 
 
-mongoose.connect("mongodb://localhost/RA", { useNewUrlParser: true });
+mongoose.connect("mongodb://localhost/RA",{ useNewUrlParser: true });
+mongoose.set('useFindAndModify', false);
 
 //routes
 
@@ -43,11 +45,14 @@ app.get("/", function(req, res) {
 app.get("/saved", function(req, res) {
     db.Article.find({saved: true})
     .populate("notes")
-    .exec(function(err, articles) {
+    .then(function(err, articles) {
         var hbsObject = {
             article: articles
         };
         res.render("saved", hbsObject);
+    })
+    .catch(function(err) {
+        res.json(err);
     });
 });
 
@@ -116,7 +121,7 @@ app.get("/news", function(req, res) {
 
 //route to grab specific article with note
 app.get("/news/:id", function(req, res) {
-    db.Article.findOne({ _id: req.params.id})
+    db.Article.find({ _id: req.params.id})
     .populate("note")
     .then(function(dbArticle) {
         res.json(dbArticle) 
@@ -127,15 +132,13 @@ app.get("/news/:id", function(req, res) {
 });
 
 //route for saving an article
-app.post("/news/save/:id", function(req, res) {
+app.put("/news/save/:id", function(req, res) {
     db.Article.findOneAndUpdate({_id: req.params.id}, {saved: true})
-    .exec(function(err, data) {
-        if (err) {
-            console.log(err);
-        }
-        else {
-            res.send(data);
-        }
+    .then(function(dbArticle) {
+        res.json(dbArticle)
+    })
+    .catch(function(err) {
+        res.json(err);
     });
     
 });
@@ -146,7 +149,7 @@ app.post("/news/save/:id", function(req, res) {
 app.post("/news/:id", function(req, res) {
     db.Note.create(req.body)
     .then(function(dbNote) {
-        return db.Article.findOneAndUpdate({ _id: req.params.id}, {note: dbNote._id}, {new: true});
+        return db.Article.findOneAndUpdate({ _id: req.params.id}, {$push:{note: dbNote._id}}, {new: true});
     })
     .then(function(dbArticle) {
         res.json(dbArticle);
@@ -158,16 +161,14 @@ app.post("/news/:id", function(req, res) {
 
 
 //route to delete one article
-app.post("/news/delete/:id", function(req, res) {
+app.delete("/delete/:id", function(req, res) {
     db.Article.findOneAndUpdate({id: req.params.id}, {saved: false})
-    .exec(function(err, data) {
-        if (err) {
-            console.log(err);
-        }
-        else {
-            res.send(data);
-        }
-    });
+    .then(function(dbArticle) {
+        res.json(dbArticle)
+    })
+    .catch(function(err) {
+        res.json(err);
+    })
 });
 
 
@@ -185,32 +186,38 @@ app.get("/saved", function(req, res) {
 
 
 //route to save new note
-app.post("/notes/save/:id", function(req, res) {
-    var newNote = new Note ({
-        body: req.body.text,
-        article: req.params.id
-    });
-    newNote.save(function(err, data) {
-        if (err) {
-            console.log(err)
-        }
-        else {
-            db.Article.findOneAndUpdate({id: req.params.id}, {$push: {"notes": data}})
-            .exec(function(error) {
-                if (error) {
-                    console.log(error);
-                }
-                else {
-                    res.send(data);
-                }
-            });
-        }
+// app.post("/notes/save/:id", function(req, res) {
+//     db.Note.create(req.body)
+//     .then(function(dbNote) {
+//         return db.Article.findOneAndUpdate({_id: req.params.id}, {note: dbNote._id,}, {body: req.body.text}, {new:true});
+//     })
+//     .then(function(dbArticle) {
+//         res.json(dbArticle);
+//     })
+//     .catch(function(err) {
+//         res.json(err);
+//     });
+// });
+
+
+// Create a new note
+app.post("/notes/:id", function(req, res) {
+    db.Note.create(req.body)
+    .then(function(dbNote) {
+        return db.Article.findOneAndUpdate({_id: req.params.id}, {$psuh: {note: dbNote._id}}, {new: true});
+    })
+    .then(function(dbArticle) {
+        res.json(dbArticle);
+    })
+    .catch(function(err) {
+        res.json(err);
     });
 });
+    
 
 
 //route to delete an article's note
-app.delete("/notes/delete/:note_id/:article_id", function(req, res) {
+app.delete("/notes/:id", function(req, res) {
     console.log(req.params.id);
     db.Note.findOneandRemove({id: req.params.note_id})
     .then(function(dbNote) {
