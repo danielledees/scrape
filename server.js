@@ -24,12 +24,26 @@ app.engine("handlebars", exphbs({ defaultLayout: "main", partialsDir: path.join(
 app.set("view engine", "handlebars");
 
 
-// If deployed, use the deployed database. Otherwise use the local mongoHeadlines database
-var MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/mongoHeadlines";
+var databaseUri = 'mongodb://localhost/mongoHeadlines';
 
-mongoose.connect(MONGODB_URI);
-mongoose.connect("mongodb://localhost/RA",{ useNewUrlParser: true });
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI);
+} else {
+  mongoose.connect(databaseUri, { useNewUrlParser: true });
+}
+
+mongoose.set('useNewUrlParser', true);
 mongoose.set('useFindAndModify', false);
+mongoose.set('useCreateIndex', true);
+
+
+// If deployed, use the deployed database. Otherwise use the local mongoHeadlines database
+// var MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/RA";
+
+// mongoose.connect(MONGODB_URI);
+// mongoose.connect("mongodb://localhost/RA",{ useNewUrlParser: true });
+// mongoose.set('useFindAndModify', false);
+
 
 //routes
 
