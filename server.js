@@ -8,7 +8,7 @@ var path = require("path");
 var db = require("./models");
 
 
-var PORT = 8080;
+var PORT = process.env.PORT || 8080;
 
 var app = express();
 
@@ -24,7 +24,7 @@ app.engine("handlebars", exphbs({ defaultLayout: "main", partialsDir: path.join(
 app.set("view engine", "handlebars");
 
 
-var databaseUri = 'mongodb://localhost/mongoHeadlines';
+var databaseUri = 'mongodb://localhost/RA';
 
 if (process.env.MONGODB_URI) {
   mongoose.connect(process.env.MONGODB_URI);
@@ -49,31 +49,31 @@ mongoose.set('useCreateIndex', true);
 
 //handlebars route
 app.get("/", function(req, res) {
-    db.Article.find({})
+    db.Article.find({"saved": false})
     .then(function (dbArticle) {
         var hbsObject = {
-            article: dbArticle
+            articles: dbArticle
         };
-        res.render("index", hbsObject);
+        res.render("index", hbsArticles);
     })
     .catch(function(err) {
         console.log(err);
     }); 
 });
 
-app.get("/saved", function(req, res) {
-    db.Article.find({saved: true})
-    .populate("notes")
-    .then(function(err, articles) {
-        var hbsObject = {
-            article: articles
-        };
-        res.render("saved", hbsObject);
-    })
-    .catch(function(err) {
-        res.json(err);
-    });
-});
+// app.get("/saved", function(req, res) {
+//     db.Article.find({saved: true})
+//     .populate("notes")
+//     .then(function(err, articles) {
+//         var hbsObject = {
+//             article: articles
+//         };
+//         res.render("saved", hbsObject);
+//     })
+//     .catch(function(err) {
+//         res.json(err);
+//     });
+// });
 
 //GET route for scraping from resident advisor news column
 app.get("/scrape", function(req, res) {
@@ -104,7 +104,7 @@ app.get("/scrape", function(req, res) {
 
             // console.log(result.title);
             // console.log(result.link);
-           
+           result.saved = false;
             console.log(result);
             
             db.Article.create(result)
@@ -137,7 +137,7 @@ app.get("/news", function(req, res) {
 });
 
 
-
+//////////////////////////////////////////////////////////////////
 //route to grab specific article with note
 app.get("/news/:id", function(req, res) {
     db.Article.find({ _id: req.params.id})
