@@ -20,7 +20,7 @@ app.use(express.static("public"));
 // Set Handlebars.
 var exphbs = require("express-handlebars");
 
-app.engine("handlebars", exphbs({ defaultLayout: "main",}));
+app.engine("handlebars", exphbs({ defaultLayout: "main", partialsDir: path.join(__dirname, "/views/layouts/partials") }));
 app.set("view engine", "handlebars");
 
 
@@ -37,9 +37,19 @@ mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 
 
+// If deployed, use the deployed database. Otherwise use the local mongoHeadlines database
+// var MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/RA";
+
+// mongoose.connect(MONGODB_URI);
+// mongoose.connect("mongodb://localhost/RA",{ useNewUrlParser: true });
+// mongoose.set('useFindAndModify', false);
+
+
+//routes
+
 //handlebars route
 app.get("/", function(req, res) {
-    db.Article.find({saved: false})
+    db.Article.find({"saved": false})
     .then(function (dbArticle) {
         var hbsObject = {
             articles: dbArticle
@@ -51,7 +61,19 @@ app.get("/", function(req, res) {
     }); 
 });
 
-
+app.get("/saved", function(req, res) {
+    db.Article.find({saved: true})
+    .populate("notes")
+    .then(function(err, savedArticles) {
+        var hbsObject = {
+            articles: savedArticles
+        };
+        res.render("saved", hbsObject);
+    })
+    .catch(function(err) {
+        res.json(err);
+    });
+});
 
 //GET route for scraping from resident advisor news column
 app.get("/scrape", function(req, res) {
@@ -102,13 +124,14 @@ app.get("/scrape", function(req, res) {
     });
 });
 
+
 //to clear all scrapes
-// app.get("/clear", function(req, res) {
-//     db.Article.remove({}, function(err, data) {
-//        db.Note.remove({}, function (err, data))
-//     })
-//     res.redirect("/");
-// });
+app.get("/clear", function(req, res) {
+    db.Article.remove({}, function(err, data) {
+       db.Note.remove({}, function (err, data))
+    })
+    res.redirect("/");
+});
 
 // route for grabbing news articles from the db
 app.get("/news", function(req, res) {
@@ -121,19 +144,31 @@ app.get("/news", function(req, res) {
     });
 });
 
-app.get("/saved", function(req, res) {
-    db.Article.find({saved: true})
-    .populate("notes")
-    .then(function(err, savedArticles) {
-        var hbsObject = {
-            articles: savedArticles
-        };
-        res.render("saved", hbsObject);
+
+
+//route for saving an article
+app.put("/save/:id", function(req, res) {
+    db.Article.findOneAndUpdate({_id: req.params.id}, {saved: true})
+    .then(function(dbArticle) {
+        res.json(dbArticle)
     })
     .catch(function(err) {
         res.json(err);
     });
+    
 });
+
+//route for deleting article
+app.delete("/delete/:id", function(req, res) {
+    db.Article.findOneAndUpdate({_id: req.params.id}, {"saved": false}, {new: true})
+    .then(function(dbArticle) {
+
+    })
+    .catch(function (err) {
+        res.json(err);
+    });
+});
+
 
 // route to grab specific article with note
 app.get("/news/:id", function(req, res) {
@@ -147,17 +182,7 @@ app.get("/news/:id", function(req, res) {
     });
 });
 
-//route for saving an article
-app.put("/save/:id", function(req, res) {
-    db.Article.findOneAndUpdate({_id: req.params.id}, {saved:true})
-    .then(function(data) {
-        res.json(data)
-    })
-    .catch(function(err) {
-        res.json(err);
-    });
-    
-});
+
 
 //route for saving/updating article's notes
 app.post("/news/:id", function(req, res) {
@@ -188,16 +213,37 @@ app.post("/news/:id", function(req, res) {
     });
 });
 
-//route for deleting article
-app.delete("/delete/:id", function(req, res) {
-    db.Article.findOneAndUpdate({_id: req.params.id}, {"saved": false}, {new: true})
-    .then(function(dbArticle) {
+//route for grabbing all saved articles
+// app.get("/saved", function(req, res) {
+//     db.Article.find({saved: true})
+//     .populate("note")
+//     .then(function(dbArticle) {
+//         res.json(dbArticle);
+//     })
+//     .catch(function(err) {
+//         res.json(err);
+//     });
+// });
 
+
+
+
+
+// Create a new note
+app.post("/notes/:id", function(req, res) {
+    db.Note.create(req.body)
+    .then(function(dbNote) {
+        return db.Article.findOneAndUpdate({_id: req.params.id}, {$psuh: {note: dbNote._id}}, {new: true});
     })
-    .catch(function (err) {
+    .then(function(dbArticle) {
+        res.json(dbArticle);
+    })
+    .catch(function(err) {
         res.json(err);
     });
 });
+    
+
 
 //route to delete an article's note
 app.delete("/notes/:id", function(req, res) {
@@ -215,6 +261,17 @@ app.delete("/notes/:id", function(req, res) {
     });
 });
 
+
+//delete all articles
+app.delete("/news/delete", function(req, res) {
+    db.Article.remove({})
+    .then(function(err) {
+        res.json(err);
+    })
+  
+});
+
 app.listen(PORT, function() {
     console.log("App listening on port " + PORT);
 });
+
